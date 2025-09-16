@@ -35,18 +35,18 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 func parseRequestLine(requestLine string) (*RequestLine, error) {
 	parts := strings.Split(requestLine, " ")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("Wrong number of parts in request line: %v", len(parts))
+		return nil, fmt.Errorf("wrong number of parts in request line: %v", len(parts))
 	}
 
 	method := parts[0]
 	if !hasOnlyCapitalLetters(method) {
-		return nil, fmt.Errorf("Method contains a character that is not capital letter: %v", method)
+		return nil, fmt.Errorf("method contains a character that is not capital letter: %v", method)
 	}
-	
+
 	target := parts[1]
 
 	if parts[2] != "HTTP/1.1" {
-		return nil, fmt.Errorf("Unsupported HTTP version: %v", parts[1])
+		return nil, fmt.Errorf("unsupported HTTP version: %v", parts[1])
 	}
 	version := strings.Split(parts[2], "/")[1]
 
@@ -54,10 +54,10 @@ func parseRequestLine(requestLine string) (*RequestLine, error) {
 }
 
 func hasOnlyCapitalLetters(s string) bool {
-    for _, r := range s {
-        if !unicode.IsUpper(r) {
-            return false
-        }
-    }
-    return true
+	for _, r := range s {
+		if !unicode.IsUpper(r) {
+			return false
+		}
+	}
+	return true
 }
