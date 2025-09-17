@@ -1,13 +1,11 @@
-
-
 package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"strings"
+
+	"github.com/roerd/httpfromtcp/internal/request"
 )
 
 func main() {
@@ -23,41 +21,17 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Println("Connection accepted")
-		for line := range getLinesChannel(conn) {
-			fmt.Println(line)
+		request, err := request.RequestFromReader(conn)
+		if err != nil {
+			log.Fatal(err)
 		}
+
+		requestLine := request.RequestLine
+		fmt.Println("Request line:")
+		fmt.Println("- Method:", requestLine.Method)
+		fmt.Println("- Target:", requestLine.RequestTarget)
+		fmt.Println("- Version:", requestLine.HttpVersion)
+
 		fmt.Println("Connection closed")
 	}
-}
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	lines := make(chan string)
-
-	go func() {
-		b := make([]byte, 8)
-		current_line := ""
-		
-		for {
-			n, err := f.Read(b)
-			if err != nil {
-				break
-			}
-			parts := strings.Split(string(b[:n]), "\n")
-			last := len(parts) - 1
-			for _, part := range parts[:last] {
-				lines <- current_line + part
-				current_line = ""
-			}
-			current_line += parts[last]
-		}
-		
-		if current_line != "" {
-			lines <- current_line
-		}
-
-		close(lines)
-		f.Close()
-	}()
-
-	return lines
 }
