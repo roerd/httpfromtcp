@@ -30,7 +30,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("invalid header line: %q", line)
 	}
 	key = strings.TrimLeft(key, " \t")
-	matched, _ := regexp.MatchString("^[a-zA-Z0-9!#$%&'*+-.^_`|~]+$", key)
+	matched, _ := regexp.MatchString("^[a-zA-Z0-9!#$%&'*+.^_`|~-]+$", key)
 	if !matched {
 		return 0, false, fmt.Errorf("invalid header key: %q", key)
 	}
