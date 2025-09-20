@@ -1,23 +1,28 @@
 package request
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"unicode"
+
+	"github.com/roerd/httpfromtcp/internal/headers"
 )
 
 type RequestStatus int
 
 const (
-	initialized RequestStatus = iota
-	done
+	requestStateInitialized RequestStatus = iota
+	requestStateHeaders
+	requestStateDone
 )
 
 const bufferSize = 8
 
 type Request struct {
 	RequestLine   RequestLine
+	Headers       headers.Headers
 	RequestStatus RequestStatus
 }
 
@@ -28,13 +33,25 @@ type RequestLine struct {
 }
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	request := Request{RequestStatus: initialized}
+	request := Request{RequestStatus: requestStateInitialized}
 
 	buf := make([]byte, bufferSize)
 	totalBytesRead := 0
-	for {
+	for request.RequestStatus != requestStateDone {
+		if totalBytesRead >= len(buf) {
+			newBuf := make([]byte, len(buf)*2)
+			copy(newBuf, buf)
+			buf = newBuf
+		}
+
 		n, err := reader.Read(buf[totalBytesRead:])
-		if err != nil && err != io.EOF {
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if request.RequestStatus != requestStateDone {
+					return nil, fmt.Errorf("error: reached EOF before request was fully parsed")
+				}
+				break
+			}
 			return nil, fmt.Errorf("error reading from reader: %v", err)
 		}
 		totalBytesRead += n
@@ -49,26 +66,30 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			copy(buf, buf[numBytesConsumed:totalBytesRead])
 			totalBytesRead -= numBytesConsumed
 		}
-
-		if request.RequestStatus == done {
-			break
-		}
-
-		if err == io.EOF {
-			return nil, fmt.Errorf("error: reached EOF before request was fully parsed")
-		}
-
-		if totalBytesRead == len(buf) {
-			buf = append(buf, make([]byte, bufferSize)...)
-		}
 	}
 
 	return &request, nil
 }
 
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.RequestStatus != requestStateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return totalBytesParsed + n, err
+		}
+		if n == 0 {
+			// not enough data to parse the next line in the request yet
+			break
+		}
+		totalBytesParsed += n
+	}
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.RequestStatus {
-	case initialized:
+	case requestStateInitialized:
 		requestLine, numBytesConsumed, err := parseRequestLine(string(data))
 		if err != nil {
 			return numBytesConsumed, err
@@ -80,10 +101,22 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 
 		r.RequestLine = *requestLine
-		r.RequestStatus = done
+		r.RequestStatus = requestStateHeaders
 		return numBytesConsumed, nil
-	case done:
-		return 0, fmt.Errorf("error: trying to read data in a  done state")
+	case requestStateHeaders:
+		if r.Headers == nil {
+			r.Headers = headers.NewHeaders()
+		}
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return n, err
+		}
+		if done {
+			r.RequestStatus = requestStateDone
+		}
+		return n, nil
+	case requestStateDone:
+		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
 		return 0, fmt.Errorf("error: unknown state")
 	}
