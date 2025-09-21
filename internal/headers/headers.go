@@ -41,3 +41,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	h[key] = value
 	return len(line) + len("\r\n"), false, nil
 }
+
+func (h Headers) Get(key string) string {
+	return h[strings.ToLower(key)]
+}
