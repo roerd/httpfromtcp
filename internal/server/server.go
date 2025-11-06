@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"sync/atomic"
+
+	"github.com/roerd/httpfromtcp/internal/response"
 )
 
 type Server struct {
@@ -34,7 +36,7 @@ func (s *Server) listen() {
 		}
 		conn, err := s.listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connection:", err)
+			log.Println("Error accepting connection:", err)
 			continue
 		}
 		go s.handle(conn)
@@ -43,10 +45,22 @@ func (s *Server) listen() {
 
 func (s *Server) handle(conn net.Conn) {
 	log.Printf("handling connection from %s\n", conn.RemoteAddr())
-	conn.Write([]byte(`HTTP/1.1 200 OK
-Content-Type: text/plain
-Content-Length: 13
 
-Hello World!`))
-	conn.Close()
+	defer conn.Close()
+
+	body := []byte("")
+
+	err := response.WriteStatusLine(conn, 200)
+	if err != nil {
+		log.Println("Error writing status line:", err)
+		return
+	}
+	headers := response.GetDefaultHeaders(len(body))
+	err = response.WriteHeaders(conn, headers)
+	if err != nil {
+		log.Println("Error writing headers:", err)
+		return
+	}
+	conn.Write([]byte("\r\n"))
+	conn.Write(body)
 }
