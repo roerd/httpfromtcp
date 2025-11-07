@@ -82,7 +82,11 @@ func (s *Server) handle(conn net.Conn) {
 
 	request, err := request.RequestFromReader(conn)
 	if err != nil {
-		log.Println("Error reading request:", err)
+		hErr := &HandlerError{
+			StatusCode: 400,
+			Message:    err.Error(),
+		}
+		hErr.Write(conn)
 		return
 	}
 
