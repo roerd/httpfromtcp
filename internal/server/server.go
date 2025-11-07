@@ -63,11 +63,11 @@ func (s *Server) Close() error {
 
 func (s *Server) listen() {
 	for {
-		if s.isClosed.Load() {
-			return
-		}
 		conn, err := s.listener.Accept()
 		if err != nil {
+			if s.isClosed.Load() {
+				return
+			}
 			log.Println("Error accepting connection:", err)
 			continue
 		}
