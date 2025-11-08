@@ -35,6 +35,5 @@ func handler(w io.Writer, req *request.Request) *server.HandlerError {
 	if req.RequestLine.RequestTarget == "/myproblem" {
 		return &server.HandlerError{StatusCode: 500, Message: "Woopsie, my bad\n"}
 	}
-	fmt.Fprint(w, "All good, frfr\n")
-	return &server.HandlerError{StatusCode: 200, Message: "OK"}
+
 }
