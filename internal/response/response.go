@@ -36,9 +36,9 @@ func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 
 func GetDefaultHeaders(contentLen int, contentType string) headers.Headers {
 	return headers.Headers{
-		"Content-Length": fmt.Sprintf("%d", contentLen),
-		"Connection":     "close",
-		"Content-Type":   contentType,
+		"content-length": fmt.Sprintf("%d", contentLen),
+		"connection":     "close",
+		"content-type":   contentType,
 	}
 }
 

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/roerd/httpfromtcp/internal/request"
@@ -76,6 +79,47 @@ func handler(w *response.Writer, req *request.Request) {
 		_, err = w.WriteBody(body)
 		if err != nil {
 			log.Panicf("Error writing body: %v", err)
+		}
+		return
+	}
+
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
+		path := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin/")
+		err := w.WriteStatusLine(200)
+		if err != nil {
+			log.Panicf("Error writing status line: %v", err)
+		}
+		headers := response.GetDefaultHeaders(0, "application/json")
+		headers.Delete("Content-Length")
+		headers.Set("Transfer-Encoding", "chunked")
+		err = w.WriteHeaders(headers)
+		if err != nil {
+			log.Panicf("Error writing headers: %v", err)
+		}
+		resp, err := http.Get("https://httpbin.org/" + path)
+		if err != nil {
+			log.Panicf("Error making HTTP request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		buf := make([]byte, 1024)
+		for {
+			n, err := resp.Body.Read(buf)
+			if err != nil && err != io.EOF {
+				log.Panicf("Error reading response body: %v", err)
+			}
+			log.Printf("received %d bytes\n", n)
+			if n == 0 {
+				break
+			}
+			_, err = w.WriteChunkedBody(buf[:n])
+			if err != nil {
+				log.Panicf("Error writing chunk: %v", err)
+			}
+		}
+		_, err = w.WriteChunkedBodyDone()
+		if err != nil {
+			log.Panicf("Error writing chunk: %v", err)
 		}
 		return
 	}
