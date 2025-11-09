@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -18,7 +17,7 @@ type Server struct {
 	isClosed atomic.Bool
 }
 
-type Handler func(w io.Writer, req *request.Request) *HandlerError
+type Handler func(w *response.Writer, req *request.Request)
 
 type HandlerError struct {
 	StatusCode response.StatusCode
@@ -30,7 +29,7 @@ func (herr *HandlerError) Write(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	headers := response.GetDefaultHeaders(len(herr.Message))
+	headers := response.GetDefaultHeaders(len(herr.Message), "text/plain")
 	err = response.WriteHeaders(w, headers)
 	if err != nil {
 		return err
@@ -90,27 +89,7 @@ func (s *Server) handle(conn net.Conn) {
 		return
 	}
 
-	buf := new(bytes.Buffer)
+	writer := response.NewWriter(conn)
 
-	herr := s.handler(buf, request)
-	if herr.StatusCode >= 400 {
-		herr.Write(conn)
-		return
-	}
-
-	body := buf.Bytes()
-
-	err = response.WriteStatusLine(conn, herr.StatusCode)
-	if err != nil {
-		log.Println("Error writing status line:", err)
-		return
-	}
-	headers := response.GetDefaultHeaders(len(body))
-	err = response.WriteHeaders(conn, headers)
-	if err != nil {
-		log.Println("Error writing headers:", err)
-		return
-	}
-	conn.Write([]byte("\r\n"))
-	conn.Write(body)
+	s.handler(writer, request)
 }
