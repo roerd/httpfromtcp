@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -83,8 +85,7 @@ func handler(w *response.Writer, req *request.Request) {
 		return
 	}
 
-	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
-		path := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin/")
+	if path, ok := strings.CutPrefix(req.RequestLine.RequestTarget, "/httpbin/"); ok {
 		err := w.WriteStatusLine(200)
 		if err != nil {
 			log.Panicf("Error writing status line: %v", err)
@@ -92,6 +93,7 @@ func handler(w *response.Writer, req *request.Request) {
 		headers := response.GetDefaultHeaders(0, "application/json")
 		headers.Delete("Content-Length")
 		headers.Set("Transfer-Encoding", "chunked")
+		headers.Set("Trailers", "X-Content-SHA256,X-Content-Length")
 		err = w.WriteHeaders(headers)
 		if err != nil {
 			log.Panicf("Error writing headers: %v", err)
@@ -103,6 +105,7 @@ func handler(w *response.Writer, req *request.Request) {
 		defer resp.Body.Close()
 
 		buf := make([]byte, 1024)
+		fullBody := make([]byte, 0)
 		for {
 			n, err := resp.Body.Read(buf)
 			if err != nil && err != io.EOF {
@@ -112,6 +115,7 @@ func handler(w *response.Writer, req *request.Request) {
 			if n == 0 {
 				break
 			}
+			fullBody = append(fullBody, buf[:n]...)
 			_, err = w.WriteChunkedBody(buf[:n])
 			if err != nil {
 				log.Panicf("Error writing chunk: %v", err)
@@ -120,6 +124,14 @@ func handler(w *response.Writer, req *request.Request) {
 		_, err = w.WriteChunkedBodyDone()
 		if err != nil {
 			log.Panicf("Error writing chunk: %v", err)
+		}
+		hash := sha256.Sum256(fullBody)
+		trailers := response.GetNewHeaders()
+		trailers.Set("X-Content-SHA256", fmt.Sprintf("%x", hash))
+		trailers.Set("X-Content-Length", fmt.Sprintf("%d", len(fullBody)))
+		err = w.WriteTrailers(trailers)
+		if err != nil {
+			log.Panicf("Error writing trailers: %v", err)
 		}
 		return
 	}

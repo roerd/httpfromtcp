@@ -42,6 +42,10 @@ func GetDefaultHeaders(contentLen int, contentType string) headers.Headers {
 	}
 }
 
+func GetNewHeaders() headers.Headers {
+	return headers.NewHeaders()
+}
+
 func WriteHeaders(w io.Writer, headers headers.Headers) error {
 	for key, value := range headers {
 		headerLine := fmt.Sprintf("%s: %s\r\n", key, value)
@@ -104,7 +108,7 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 	if w.writerState != WriterStateHeadersWritten {
 		return 0, fmt.Errorf("headers not written")
 	}
-	n, err := w.writer.Write([]byte(fmt.Sprintf("%X\r\n", len(p))))
+	n, err := fmt.Fprintf(w.writer, "%X\r\n", len(p))
 	if err != nil {
 		return n, err
 	}
@@ -121,7 +125,7 @@ func (w *Writer) WriteChunkedBodyDone() (int, error) {
 		return 0, fmt.Errorf("headers not written")
 	}
 	w.writerState = WriterStateBodyWritten
-	return w.writer.Write([]byte("0\r\n\r\n"))
+	return w.writer.Write([]byte("0\r\n"))
 }
 
 func (w *Writer) WriteTrailers(h headers.Headers) error {
