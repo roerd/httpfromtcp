@@ -136,6 +136,27 @@ func handler(w *response.Writer, req *request.Request) {
 		return
 	}
 
+	if req.RequestLine.RequestTarget == "/video" {
+		err := w.WriteStatusLine(200)
+		if err != nil {
+			log.Panicf("Error writing status line: %v", err)
+		}
+		body, err := os.ReadFile("assets/vim.mp4")
+		if err != nil {
+			log.Panicf("Error reading file: %v", err)
+		}
+		headers := response.GetDefaultHeaders(len(body), "video/mp4")
+		err = w.WriteHeaders(headers)
+		if err != nil {
+			log.Panicf("Error writing headers: %v", err)
+		}
+		_, err = w.WriteBody(body)
+		if err != nil {
+			log.Panicf("Error writing body: %v", err)
+		}
+		return
+	}
+
 	err := w.WriteStatusLine(200)
 	if err != nil {
 		log.Panicf("Error writing status line: %v", err)
