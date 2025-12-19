@@ -61,6 +61,7 @@ const (
 	WriterStateStatusLineWritten
 	WriterStateHeadersWritten
 	WriterStateBodyWritten
+	WriterStateTrailersWritten
 )
 
 type Writer struct {
@@ -121,4 +122,12 @@ func (w *Writer) WriteChunkedBodyDone() (int, error) {
 	}
 	w.writerState = WriterStateBodyWritten
 	return w.writer.Write([]byte("0\r\n\r\n"))
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	if w.writerState != WriterStateBodyWritten {
+		return fmt.Errorf("body not written")
+	}
+	w.writerState = WriterStateTrailersWritten
+	return WriteHeaders(w.writer, h)
 }
